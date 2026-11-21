@@ -194,29 +194,71 @@ class MainWindow(QMainWindow):
         self.setStatusBar(QStatusBar())
         self.statusBar().showMessage("Listo")
 
-    def _add_to_queue(self):
-        urls_raw = self.url_input.urls()
+        def _add_to_queue(self):
+            urls_raw = self.url_input.urls()
         if not urls_raw:
-            QMessageBox.warning(self, "Sin URLs", "Pega al menos una URL de YouTube.")
+            QMessageBox.warning(self, "Sin URLs", "Pega al menos una URL de YouTube o Spotify.")
             return
 
         added = 0
         invalid = 0
+
+        # Importar aquí para evitar dependencias circulares o fallos si no está instalado
+        from core.spotify import get_spotify_playlist_tracks
+        from config import SPOTIFY_CLIENT_ID
+
         for raw in urls_raw:
-            if is_valid_youtube_url(raw):
+            raw = raw.strip()
+
+            # 1. Si es una playlist de Spotify
+            if is_valid_spotify_playlist_url(raw):
+                self._log(f"  🔍 Procesando playlist de Spotify: {raw}")
+                try:
+                    tracks = get_spotify_playlist_tracks(raw)
+                    for track in tracks:
+                        # Creamos un ítem con la query de búsqueda de YouTube
+                        item = self.queue.add(track["query"])
+                        item.title = track["title"]
+                        item.artist = track["artist"]
+
+                        # Mostramos el nombre real en la UI, no la query "ytsearch1:..."
+                        display_name = f"{track['artist']} - {track['title']}"
+                        self.queue_view.add_item(item.id, display_name)
+                        added += 1
+
+                    self._log(f"  ✅ {len(tracks)} canciones agregadas desde Spotify")
+
+                except ValueError as e:
+                    self._log(f"  ✗ Error en Spotify: {e}")
+                    QMessageBox.warning(
+                        self, "Error de Configuración",
+                        str(e) + "\n\nRevisa el archivo config.py"
+                    )
+                    return # Detenemos el proceso si falla la config
+                except Exception as e:
+                    self._log(f"  ✗ Error inesperado: {e}")
+                    invalid += 1
+
+            # 2. Si es un video normal de YouTube
+            elif is_valid_youtube_url(raw):
                 url = normalize_url(raw)
                 item = self.queue.add(url)
                 self.queue_view.add_item(item.id, url)
                 added += 1
+
+            # 3. URL no reconocida
             else:
                 invalid += 1
                 self._log(f"  ⚠ URL inválida ignorada: {raw}")
 
-        if invalid:
+        if invalid > 0 and added == 0:
+            QMessageBox.warning(self, "URLs inválidas", "No se pudo agregar ninguna URL válida.")
+        elif invalid > 0:
             QMessageBox.information(
-                self, "URLs inválidas",
-                f"Se agregaron {added} URLs.\n{invalid} URLs inválidas fueron ignoradas."
+                self, "Parcialmente completado",
+                f"Se agregaron {added} ítems.\n{invalid} URLs inválidas fueron ignoradas."
             )
+
         self.url_input.input.clear()
         self.statusBar().showMessage(f"{added} ítem(s) agregado(s) a la cola")
 

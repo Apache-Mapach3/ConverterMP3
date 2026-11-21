@@ -21,3 +21,10 @@ USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/120.0.0.0 Safari/537.36"
 )
+# ==========================================================
+# CREDENCIALES DE SPOTIFY API
+# Obtén las tuyas gratis en: https://developer.spotify.com/dashboard
+# (Crea una App, copia el "Client ID" y "Client Secret")
+# ==========================================================
+SPOTIFY_CLIENT_ID = "TU_CLIENT_ID_AQUI"
+SPOTIFY_CLIENT_SECRET = "TU_CLIENT_SECRET_AQUI"
